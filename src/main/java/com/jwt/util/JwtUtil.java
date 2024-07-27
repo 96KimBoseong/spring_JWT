@@ -7,7 +7,6 @@ import io.jsonwebtoken.security.SignatureException;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +15,7 @@ import org.springframework.util.StringUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Base64;
 import java.util.Date;
@@ -51,7 +51,7 @@ public class JwtUtil {
     public String createToken(String username, UserRoleEnum role){
         Date date = new Date();
 
-        return BEARER_PREFIX +
+        return BEARER_PREFIX+
                 Jwts.builder()
                         .setSubject(username) // 사용자 식별자값(ID) JWT의 subject에 사용자의 식별값 즉, ID를 넣습니다.
                         .claim(AUTHORIZATION_KEY, role) // 사용자 권한 JWT에 사용자의 권한 정보를 넣습니다. key-value 형식으로 key 값을 통해 확인할 수 있습니다.
@@ -62,24 +62,20 @@ public class JwtUtil {
     }
     //
     // 생성된 jwt를 쿠키에 저장
-    public void addJwtCookie(String token, HttpServletResponse response){
-        try {
-            token = URLEncoder.encode(token,"utf-8").replace("\\+", "%20"); // Cookie Value 에는 공백이 불가능해서 encoding 진행
+    public void addJwtToCookie(String token, HttpServletResponse response){
+        token = URLEncoder.encode(token, StandardCharsets.UTF_8).replaceAll("\\+", "%20"); // Cookie Value 에는 공백이 불가능해서 encoding 진행
 
-            Cookie cookie = new Cookie(AUTHORIZATION_HEADER,token); // Name-Value
-            cookie.setPath("/");
+        Cookie cookie = new Cookie(AUTHORIZATION_HEADER,token); // Name-Value
+        cookie.setPath("/");
 
-            response.addCookie(cookie); // Response 객체에 Cookie 추가
-        }catch (UnsupportedEncodingException e){
-            logger.error(e.getMessage());
-        }
+        response.addCookie(cookie); // Response 객체에 Cookie 추가
     }
     // 쿠키에 들어있는 jwt 토큰을 SubString - 순수 토큰 값만 얻기위한 메서드 토큰값 앞에 붙은 접두사 삭제삭제
     public String substringToken(String tokenValue){
         //StringUtils.hasText(tokenValue) 공백인지 null인지 확인가능
         // &&tokenValue.startsWith(BEARER_PREFIX) // 토큰값이  BEARER_PREFIX == Bearer 로 시작하는지 검증
         //StringUtils.hasText를 사용하여 공백, null을 확인하고 startsWith을 사용하여 토큰의 시작값이 Bearer이 맞는지 확인
-        if (StringUtils.hasText(tokenValue)&&tokenValue.startsWith(BEARER_PREFIX)){
+        if (StringUtils.hasText(tokenValue) && tokenValue.startsWith(BEARER_PREFIX)){
             return tokenValue.substring(7);
             //Bearer 이 6자 이고 공백까지 총 7
             //맞다면 순수 JWT를 반환하기 위해 substring을 사용하여 Bearer+"" 을 자르기
@@ -91,7 +87,7 @@ public class JwtUtil {
     // jwt 검증
     public boolean validateToken(String token){
         try {
-            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJwt(token);
+            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
             //key를 넣고 매개변수를 넣어줘 토큰을 검증함
             //JWT가 위변조되지 않았는지 secretKey(key)값을 넣어 확인
             return true;
